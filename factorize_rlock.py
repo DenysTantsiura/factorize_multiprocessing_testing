@@ -1,10 +1,12 @@
 # import multiprocessing
-from multiprocessing import cpu_count, Pool
+from multiprocessing import RLock, Process, cpu_count, Manager  # current_process
 import logging
+import sys
 from time import time
 
 # multiprocessing.set_start_method('spawn')
 max_relevant_threads = cpu_count()
+lock = RLock()
 
 logger = logging.getLogger("Logging factorize")
 logger.setLevel(logging.DEBUG)
@@ -58,12 +60,12 @@ def factorize(*numbers):
     return rez
 
 
-def all_divisors_of_the_number(number: int) -> None:
+def all_divisors_of_the_number(number: int, locker: RLock, return_dict: Manager().dict()) -> None:
     # name = current_process().name
     logger.debug(f"Calculating for {number} started...")
-
+    locker.acquire()
     if number == 0:
-        return []
+        return_dict[number] = []
 
     subnumber_group = [1]
     for i in range(2, int(pow(number, 0.5)) + 1):  # int(pow(number, 0.5)) + 1)|(number//2)+1
@@ -73,21 +75,29 @@ def all_divisors_of_the_number(number: int) -> None:
 
     subnumber_group.append(number)
     subnumber_group.sort()
-
-    return subnumber_group
+    return_dict[number] = subnumber_group
+    locker.release()
+    # sys.exit(0)
 
 
 @fix_duration
 def factorize_process(*numbers):
     logger.debug("START factorize_process")
-    # manager = Manager()
-    # return_dict = manager.dict()
-    with Pool(processes=max_relevant_threads) as pool:
-        rez = pool.map(all_divisors_of_the_number, list(numbers))
+    manager = Manager()
+    return_dict = manager.dict()
+
+    processes = []
+    for number in numbers:
+        pr = Process(target=all_divisors_of_the_number, args=(number, lock, return_dict))
+        pr.start()
+        processes.append(pr)
+
+    [el.join() for el in processes]
+    [print(el.exitcode, end=' ') for el in processes]
 
     logger.debug("END factorize_process")
 
-    return rez
+    return return_dict.values()
 
 
 if __name__ == "__main__":
