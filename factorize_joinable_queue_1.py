@@ -27,7 +27,7 @@ def fix_duration(my_function):
     return inner
 
 
-def all_divisors_of_the_number_0(number: int) -> list:
+def all_divisors_of_the_number_1(number: int) -> list:
 
     if number == 0:
         return []
@@ -49,10 +49,30 @@ def factorize(*numbers):
     logger.debug("START factorize")
     rez = []
     for number in numbers:
-        subnumber_group = all_divisors_of_the_number_0(number)
+        subnumber_group = all_divisors_of_the_number_1(number)
         rez.append(subnumber_group)
 
     logger.debug("END factorize")
+
+    return rez
+
+
+@fix_duration
+def factorize_1(*numbers):
+    logger.debug("START factorize_1")
+    rez = []
+    for number in numbers:
+        subnumber_group = [1]
+        for i in range(2, int(pow(number, 0.5)) + 1):  # (number//2)+1
+            if number % i == 0:
+                subnumber_group.append(i)
+                subnumber_group.append(int(number / i))
+
+        subnumber_group.append(number)
+        subnumber_group.sort()
+        rez.append(subnumber_group)
+
+    logger.debug("END factorize_1")
 
     return rez
 
@@ -66,6 +86,7 @@ def all_divisors_of_the_number(
 
     if number == 0:
         jqueue.task_done()
+        # return []
         return_dict[number] = []
 
     subnumber_group = [1]
@@ -76,6 +97,9 @@ def all_divisors_of_the_number(
 
     subnumber_group.append(number)
     subnumber_group.sort()
+    # jqueue.task_done()
+
+    # return subnumber_group
     return_dict[number] = subnumber_group
     jqueue.task_done()
     sys.exit(0)
@@ -86,7 +110,14 @@ def factorize_process(*numbers):
     logger.debug("START factorize_process")
     manager = Manager()
     return_dict = manager.dict()
+
     joinable_queue = JoinableQueue()
+
+    # for number in numbers:  # range(2) or max_relevant_threads
+    #     Process(
+    #         target=all_divisors_of_the_number, args=(joinable_queue, return_dict)
+    #     ).start()
+    #     joinable_queue.put(number)
 
     [
         joinable_queue.put(number)
@@ -95,6 +126,9 @@ def factorize_process(*numbers):
             target=all_divisors_of_the_number, args=(joinable_queue, return_dict)
         ).start()
     ]
+    # for number in numbers:
+    #     joinable_queue.put(number)
+    # rez.append(all_divisors_of_the_number(number))
 
     joinable_queue.join()
     logger.debug("END factorize_process")
@@ -105,6 +139,8 @@ def factorize_process(*numbers):
 if __name__ == "__main__":
 
     print(f"{max_relevant_threads=}")
+
+    print(factorize_1(128, 255, 99999, 10651060))
 
     print(factorize(128, 255, 99999, 10651060))
 
